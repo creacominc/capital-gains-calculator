@@ -1,0 +1,4 @@
+transaction_type,date,base_asset,base_quantity,extra
+SPLIT,2021-10-05,ISRG,10,ratio=3:1
+SPLIT,2021-07-20,NVDA,24,ratio=4:1
+

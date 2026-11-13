@@ -17,3 +17,10 @@ site/
 .wrangler/
 exchange_rates.csv
 .lycheecache
+
+# Private input files and generated reports
+/data/cleanup-audit
+/data/schwab-clean
+/data/out/log
+/data/out/tests
+/data/out/raw

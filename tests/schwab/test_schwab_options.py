@@ -568,6 +568,21 @@ def test_schwab_options_run_from_csv_to_report(tmp_path: Path) -> None:
     assert "does not change the Section 104 holding" in text
 
 
+def test_weekly_assignments_reserve_their_own_settlement_rows() -> None:
+    """A later weekly assignment is not an alternative earlier settlement."""
+    transactions = _read(
+        "12/16/2024,Sell,SOUN,Settlement,13,100,0.06,1299.94",
+        "12/16/2024,Assigned,SOUN 12/13/2024 13.00 C,Assignment,,1,,",
+        "12/10/2024,Sell to Open,SOUN 12/13/2024 13.00 C,Grant,1,1,0,100",
+        "12/09/2024,Sell,SOUN,Settlement,13,100,0.06,1299.94",
+        "12/09/2024,Assigned,SOUN 12/06/2024 13.00 C,Assignment,,1,,",
+        "12/02/2024,Sell to Open,SOUN 12/06/2024 13.00 C,Grant,1,1,0,100",
+    )
+    sales = [row for row in transactions if row.action is ActionType.SELL]
+    assert len(sales) == 2
+    assert {row.date for row in sales} == {dt.date(2024, 12, 9), dt.date(2024, 12, 16)}
+
+
 def test_assignment_without_a_settlement_row_is_refused() -> None:
     """Inventing the shares would double the disposal if the row turns up."""
     with pytest.raises(ParsingError, match="no META transaction that settles"):

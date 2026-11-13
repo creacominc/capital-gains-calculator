@@ -374,6 +374,35 @@ def _find_assignment_share_transaction(
         for candidate in candidates
         if _settles_assignment(candidate, contract, assigned_shares)
     ]
+    # A later assignment can settle at the same strike, exactly one week
+    # after this one. Reserve its uniquely identified same-day stock row
+    # before deciding that the earlier assignment has two possible matches.
+    # Do not resolve two genuinely ambiguous same-day settlements by order.
+    if len(settling) > 1:
+        reserved = set()
+        for other in transactions:
+            other_contract = other.option_contract
+            if (other.action is not ActionType.OPTION_ASSIGNMENT
+                    or other_contract is None or other is assignment
+                    or other.date <= assignment.date
+                    or other_contract.underlying != contract.underlying
+                    or other_contract.option_type != contract.option_type
+                    or other_contract.strike != contract.strike
+                    or other.quantity is None
+                    or other.quantity * OPTION_ASSIGNMENT_SHARES != assigned_shares):
+                continue
+            same_day = [row for row in settling if row.date == other.date]
+            same_day_assignments = [row for row in transactions
+                                   if row.action is ActionType.OPTION_ASSIGNMENT
+                                   and row.date == other.date
+                                   and row.option_contract is not None
+                                   and row.option_contract.underlying == contract.underlying
+                                   and row.option_contract.option_type == contract.option_type
+                                   and row.option_contract.strike == contract.strike
+                                   and row.quantity == other.quantity]
+            if len(same_day) == 1 and len(same_day_assignments) == 1:
+                reserved.add(_row_key(same_day[0]))
+        settling = [row for row in settling if _row_key(row) not in reserved]
     if len(settling) > 1:
         raise ParsingError(
             file,
