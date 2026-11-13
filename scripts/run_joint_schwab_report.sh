@@ -4,7 +4,20 @@ set -euo pipefail
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo_dir"
 mkdir -p data/out/log
-report_log=$(mktemp "data/out/log/cgt-calc-$(TZ=Europe/London date +%Y-%m-%d_%H-%M-%S)-XXXXXX.log")
+report_log=$(.venv/bin/python - <<'PY'
+from datetime import datetime
+import os
+import tempfile
+from zoneinfo import ZoneInfo
+
+stamp = datetime.now(ZoneInfo("Europe/London")).strftime("%Y-%m-%d_%H-%M-%S")
+descriptor, path = tempfile.mkstemp(
+    prefix=f"cgt-calc-{stamp}-", suffix=".log", dir="data/out/log"
+)
+os.close(descriptor)
+print(path)
+PY
+)
 report_pdf="data/out/$(basename "$report_log" .log).pdf"
 printf 'Log: %s\n' "$report_log"
 printf 'PDF: %s\n' "$report_pdf"
