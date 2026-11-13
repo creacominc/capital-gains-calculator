@@ -99,8 +99,12 @@ Verification:
 For the same command with all runtime caches under `data/out`, run:
 
 ```bash
-sh scripts/run_joint_schwab_report.sh
+bash scripts/run_joint_schwab_report.sh
 ```
 
 The repository's stock CLI and test helpers still default to `out/` when explicit
 paths are omitted. Previously generated test PDFs were moved to `data/out/tests/`.
+
+The report script regenerates the RAW file before each calculation and shows
+output in the terminal while saving a unique London-timestamped log under
+`data/out/log/`. It returns a nonzero exit status when either step fails.

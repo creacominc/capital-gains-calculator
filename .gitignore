@@ -20,7 +20,8 @@ exchange_rates.csv
 
 # Private input files and generated reports
 /data/cleanup-audit
-/data/schwab-clean
+/data/input/schwab-clean
 /data/out/log
 /data/out/tests
-/data/out/raw
+/data/input/raw
+/data/interest/*.md
