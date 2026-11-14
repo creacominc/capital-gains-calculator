@@ -34,11 +34,30 @@ def redact(text):
     return text
 
 
+def page_text(page):
+    """Turn sideways text into reading coordinates before layout extraction."""
+    sideways=[c for c in page.chars if not c.get('upright', True)]
+    if not page.chars or len(sideways) < len(page.chars)*0.8:
+        return page.extract_text(layout=True) or ''
+    from pdfplumber.utils import extract_text
+    clockwise=sum(c['matrix'][1]<0 for c in sideways)>len(sideways)/2
+    chars=[]
+    for original in page.chars:
+        c=dict(original)
+        x0,x1,top,bottom=c['x0'],c['x1'],c['top'],c['bottom']
+        if clockwise:
+            c.update(x0=top,x1=bottom,top=page.width-x1,bottom=page.width-x0,upright=True)
+        else:
+            c.update(x0=page.height-bottom,x1=page.height-top,top=x0,bottom=x1,upright=True)
+        chars.append(c)
+    return extract_text(chars,layout=True,layout_width=page.height,layout_height=page.width) or ''
+
+
 def extract(job):
     source, output = map(Path, job)
     try:
         with pdfplumber.open(source) as pdf:
-            pages = [page.extract_text(layout=True) or '' for page in pdf.pages]
+            pages = [page_text(page) for page in pdf.pages]
         if not pages or not any(page.strip() for page in pages):
             raise ValueError('No extractable text; OCR required')
         text = redact('\n'.join(f'\n--- Page {n} ---\n{page}' for n, page in enumerate(pages, 1)))

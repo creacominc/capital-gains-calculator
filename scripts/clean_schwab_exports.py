@@ -223,6 +223,20 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path, *, splits_
                             "original_row_json": json.dumps(original), "output_row_json": json.dumps(row),
                         })
                         conversion_counts["TDA symbol from description"] += 1
+                # Prices displayed on no-cash splits are informational, not cost.
+                if action == "Stock Split" and row[header.index("Price")].strip():
+                    cash_and_fees = [Decimal(row[header.index(column)].replace("$", "").replace(",", "") or "0")
+                                     for column in ("Amount", "Fees & Comm")]
+                    if all(value == 0 for value in cash_and_fees):
+                        original = row.copy()
+                        row[header.index("Price")] = ""
+                        converted.append({
+                            "source_file": source.name, "source_row": line,
+                            "original_action": action, "output_action": action,
+                            "reason": "Informational price removed from no-cash stock split; shares unchanged",
+                            "original_row_json": json.dumps(original), "output_row_json": json.dumps(row),
+                        })
+                        conversion_counts["No-cash split informational price"] += 1
                 # Fractional reinvestments and migrated TDA trades can have rounded share
                 # quantities inconsistent with their stated unit price. Keep
                 # the exported shares and actual cash; never invent precision

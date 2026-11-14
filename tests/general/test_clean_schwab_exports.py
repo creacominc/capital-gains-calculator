@@ -316,3 +316,23 @@ class CleanerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_split_price_is_informational_only_when_no_cash_or_fees(tmp_path):
+    source=tmp_path/'source'
+    source.mkdir()
+    with (source/'Account_Transactions.csv').open('w',newline='') as handle:
+        writer=csv.writer(handle);writer.writerow(HEADER)
+        writer.writerow(['03/23/2026','Stock Split','ABC','Example','4','$69.69','',''])
+        writer.writerow(['03/23/2026','Stock Split','XYZ','Cash example','4','$69.69','','$5.00'])
+    clean_exports(source,tmp_path/'output',tmp_path/'audit')
+    with (tmp_path/'output'/MERGED_NAME).open(newline='') as handle:
+        rows={r['Symbol']:r for r in csv.DictReader(handle)}
+    assert rows['ABC']['Price']==''
+    assert rows['ABC']['Quantity']=='4'
+    assert rows['XYZ']['Price']=='$69.69'
+    assert rows['XYZ']['Amount']=='$5.00'
+    with (tmp_path/'audit/converted-rows.csv').open(newline='') as handle:
+        audit=list(csv.DictReader(handle))
+    assert len(audit)==1
+    assert json.loads(audit[0]['original_row_json'])[5]=='$69.69'
