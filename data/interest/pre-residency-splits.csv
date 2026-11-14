@@ -1,4 +1,9 @@
 transaction_type,date,base_asset,base_quantity,extra
 SPLIT,2021-10-05,ISRG,10,ratio=3:1
 SPLIT,2021-07-20,NVDA,24,ratio=4:1
+SPLIT,2024-06-10,NVDA,324,schwab_override
+SPLIT,2024-06-13,NVDA,0.315,schwab_override
+SPLIT,2024-07-15,AVGO,165,schwab_override; combined 9+156 additional shares
+SPLIT,2025-05-27,COKE,9,schwab_override
+SPLIT,2025-05-29,COKE,9,schwab_override; second posting in original Schwab export
 

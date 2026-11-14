@@ -40,6 +40,16 @@ that does not establish that their exclusion is correct for the final calculatio
 
 Audit files under `data/cleanup-audit/`:
 
+Split rows explicitly marked `schwab_override` in
+`data/interest/pre-residency-splits.csv` replace the corresponding Schwab
+split postings by symbol and posted date. The cleaner checks that the total
+additional shares agree, refuses to discard cash or fees, and audits the
+removed broker rows. `convert_pre_residency.py` supplies the replacement once
+as a zero-price RAW split. This handles displayed split prices without adding
+an acquisition cost or counting a split twice. Older supplemental splits remain
+separate events. Run the cleaner after changing these overrides, before the
+report launcher.
+
 - `excluded-rows.csv`: every omitted row, source line, original cells and reason.
 - `converted-rows.csv`: complete original and output rows for each conversion.
 - `journal-reconciliation.csv`: matched partners or unresolved review status.

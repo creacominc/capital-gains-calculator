@@ -77,6 +77,41 @@ def test_cleaner_reports_supported_but_unpaired_action(tmp_path: Path) -> None:
 
 
 class CleanerTests(unittest.TestCase):
+    def test_supplemental_split_replaces_exact_export_total_without_discarding_cash(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / "source"
+            source.mkdir()
+            export = source / "Account_Transactions.csv"
+            splits = root / "splits.csv"
+            splits.write_text("transaction_type,date,base_asset,base_quantity,extra\n"
+                              "SPLIT,2024-07-15,AVGO,165,schwab_override\n")
+            rows = [
+                ["07/15/2024 as of 07/12/2024", "Stock Split", "AVGO", "BROADCOM", "9", "$170.067", "", ""],
+                ["07/15/2024 as of 07/12/2024", "Stock Split", "AVGO", "BROADCOM", "156", "$170.067", "", ""],
+            ]
+            def write_export():
+                with export.open("w", newline="") as handle:
+                    writer = csv.writer(handle)
+                    writer.writerow(HEADER)
+                    writer.writerows(rows)
+            write_export()
+            original = export.read_bytes()
+            report = clean_exports(source, root / "output", root / "audit", splits_file=splits)
+            self.assertEqual(report["merged_rows"], 0)
+            self.assertEqual(export.read_bytes(), original)
+            with (root / "audit/excluded-rows.csv").open(newline="") as handle:
+                audit = list(csv.DictReader(handle))
+            self.assertEqual([json.loads(row["original_row_json"]) for row in audit], rows)
+            splits.write_text(splits.read_text().replace(",165,", ",164,"))
+            with self.assertRaisesRegex(ValueError, "export states 165"):
+                clean_exports(source, root / "output", root / "audit", splits_file=splits)
+            splits.write_text(splits.read_text().replace(",164,", ",165,"))
+            rows[0][-1] = "$1"
+            write_export()
+            with self.assertRaisesRegex(ValueError, "cannot discard cash or fees"):
+                clean_exports(source, root / "output", root / "audit", splits_file=splits)
+
     def test_tda_symbols_prices_and_cancelled_reinvestments(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

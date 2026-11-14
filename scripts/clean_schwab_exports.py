@@ -155,8 +155,23 @@ def cancel_reinvestments(source, header, rows, lines, excluded, originals):
             [line for i, line in enumerate(lines) if i not in removed])
 
 
-def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path) -> dict:
+def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path, *, splits_file: Path | None = None) -> dict:
     """Write filtered copies and log every exclusion; never modify the inputs."""
+    overrides = {}
+    if splits_file is None:
+        splits_file = Path(__file__).resolve().parents[1] / "data/interest/pre-residency-splits.csv"
+    if splits_file.exists():
+        with splits_file.open(newline="") as handle:
+            for item in csv.DictReader(handle):
+                if item.get("extra", "").startswith("schwab_override"):
+                    key = (item["base_asset"], item["date"])
+                    if key in overrides:
+                        raise ValueError(f"Duplicate supplemental split override: {key}")
+                    quantity = Decimal(item["base_quantity"])
+                    if not quantity.is_finite() or quantity <= 0:
+                        raise ValueError(f"Invalid supplemental split quantity: {key}")
+                    overrides[key] = quantity
+    replaced = Counter()
     paths = [p.resolve() for p in (input_dir, output_dir, audit_dir)]
     if len(set(paths)) != 3 or any(
         a in b.parents or b in a.parents
@@ -245,7 +260,15 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path) -> dict:
                     conversion_counts[action] += 1
                     action = "Bond Interest"
                 reason = None
-                if action.strip().casefold().startswith("journaled"):
+                split_key = (row[header.index("Symbol")], transaction_date(row[header.index("Date")]).isoformat())
+                if action == "Stock Split" and split_key in overrides:
+                    values = dict(zip(header, row))
+                    if any(Decimal(values[column].replace("$", "").replace(",", "") or "0")
+                           for column in ("Fees & Comm", "Amount")):
+                        raise ValueError(f"Split override cannot discard cash or fees: {source}:{line}")
+                    replaced[split_key] += Decimal(values["Quantity"].replace(",", ""))
+                    reason = "Replaced by zero-price supplemental RAW split; original display price is not a cash payment"
+                elif action.strip().casefold().startswith("journaled"):
                     reason = "Journaled entry excluded by requested cleanup policy"
                 else:
                     try:
@@ -268,6 +291,9 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path) -> dict:
                           "input_rows": total, "kept_rows": len(kept),
                           "converted_actions": dict(sorted(conversion_counts.items())),
                           "excluded_actions": dict(sorted(counts.items()))})
+    for key, quantity in replaced.items():
+        if quantity != overrides[key]:
+            raise ValueError(f"Supplemental split {key} states {overrides[key]} additional shares but export states {quantity}")
     output_dir.mkdir(parents=True, exist_ok=True)
     audit_dir.mkdir(parents=True, exist_ok=True)
     header, merged, provenance = merge_rows(prepared)
