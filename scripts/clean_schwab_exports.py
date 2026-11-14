@@ -223,11 +223,13 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path, *, splits_
                             "original_row_json": json.dumps(original), "output_row_json": json.dumps(row),
                         })
                         conversion_counts["TDA symbol from description"] += 1
-                # Migrated TDA fractional reinvestments can have rounded share
+                # Fractional reinvestments and migrated TDA trades can have rounded share
                 # quantities inconsistent with their stated unit price. Keep
                 # the exported shares and actual cash; never invent precision
                 # in the share count. All such effective prices are audited.
-                if action in ("Buy", "Sell", "Reinvest Shares") and row[header.index("Description")].startswith("TDA TRAN"):
+                migrated_tda = row[header.index("Description")].startswith("TDA TRAN")
+                reinvestment = action == "Reinvest Shares"
+                if action in ("Buy", "Sell", "Reinvest Shares") and (migrated_tda or reinvestment):
                     values = dict(zip(header, row))
                     def number(value):
                         return Decimal(value.replace("$", "").replace(",", "") or "0")
@@ -235,7 +237,9 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path, *, splits_
                     price = number(values["Price"])
                     amount = number(values["Amount"])
                     fees = number(values["Fees & Comm"])
-                    if quantity > 0 and len(values["Symbol"]) != 9:
+                    complete = all(values[column].strip() for column in ("Quantity", "Price", "Amount"))
+                    valid = all(value.is_finite() for value in (quantity, price, amount, fees))
+                    if complete and valid and quantity > 0 and price >= 0 and fees >= 0 and len(values["Symbol"]) != 9:
                         gross = -amount - fees if action in ("Buy", "Reinvest Shares") else amount + fees
                         if gross >= 0 and not approx_equal(quantity * price, gross):
                             original = row.copy()
@@ -243,10 +247,14 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path, *, splits_
                             converted.append({
                                 "source_file": source.name, "source_row": line,
                                 "original_action": action, "output_action": action,
-                                "reason": "REVIEW: effective price from exported cash and quantity; migrated TDA values disagree",
+                                "reason": (
+                                    "REVIEW: effective price from exported cash and quantity; migrated TDA values disagree"
+                                    if migrated_tda else
+                                    "REVIEW: reinvestment effective price from exported cash less fees and quantity; shares and cash unchanged"
+                                ),
                                 "original_row_json": json.dumps(original), "output_row_json": json.dumps(row),
                             })
-                            conversion_counts["TDA effective unit price"] += 1
+                            conversion_counts["TDA effective unit price" if migrated_tda else "Reinvestment effective unit price"] += 1
                 if action == "CD Interest":
                     original = row.copy()
                     row[header.index("Action")] = "Bond Interest"

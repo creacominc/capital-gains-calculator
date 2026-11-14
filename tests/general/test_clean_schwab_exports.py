@@ -77,6 +77,45 @@ def test_cleaner_reports_supported_but_unpaired_action(tmp_path: Path) -> None:
 
 
 class CleanerTests(unittest.TestCase):
+    def test_reinvestment_rule_is_symbol_independent_and_preserves_cash_and_fees(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / "source"
+            source.mkdir()
+            export = source / "Account_Transactions.csv"
+            rows = [
+                ["09/30/2025", "Reinvest Shares", "AVGO", "BROADCOM INC", "0.2818", "$325.4705", "$0.05", "-$91.73"],
+                ["09/30/2025", "Reinvest Shares", "OTHER", "OTHER", "0.2818", "$325.4705", "", "-$91.73"],
+                ["09/30/2025", "Buy", "AVGO", "BROADCOM INC", "0.2818", "$325.4705", "", "-$91.73"],
+                ["09/30/2025", "Reinvest Shares", "XYZ", "CONSISTENT", "2", "$5", "", "-$10"],
+                ["09/30/2025", "Reinvest Shares", "XYZ", "MISSING CASH", "2", "$5", "", ""],
+            ]
+            with export.open("w", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(HEADER)
+                writer.writerows(rows)
+            original = export.read_bytes()
+            clean_exports(source, root / "output", root / "audit")
+            self.assertEqual(export.read_bytes(), original)
+            with (root / "output" / MERGED_NAME).open(newline="") as handle:
+                cleaned = list(csv.DictReader(handle))
+            from decimal import Decimal
+            changed = cleaned[0]
+            reconstructed = Decimal(changed["Price"]) * Decimal(changed["Quantity"]) + Decimal("0.05")
+            self.assertLess(abs(reconstructed - Decimal("91.73")), Decimal("1e-20"))
+            for column in HEADER:
+                if column != "Price":
+                    self.assertEqual(changed[column], dict(zip(HEADER, rows[0]))[column])
+            self.assertNotEqual(cleaned[1]["Price"], rows[1][5])
+            for column in HEADER:
+                if column != "Price":
+                    self.assertEqual(cleaned[1][column], dict(zip(HEADER, rows[1]))[column])
+            self.assertEqual(cleaned[2:], [dict(zip(HEADER, row)) for row in rows[2:]])
+            with (root / "audit/converted-rows.csv").open(newline="") as handle:
+                audit = list(csv.DictReader(handle))
+            self.assertEqual(len(audit), 2)
+            self.assertEqual(json.loads(audit[0]["original_row_json"]), rows[0])
+
     def test_supplemental_split_replaces_exact_export_total_without_discarding_cash(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

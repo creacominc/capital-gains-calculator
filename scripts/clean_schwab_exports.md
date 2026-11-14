@@ -31,6 +31,20 @@ unsupported actions are omitted and audited.
 No other unknown financial meaning is guessed. Supported `Reinvest Dividend`
 rows are retained even though cgt-calc can ignore them.
 
+`TDA TRAN` identifies historical TD Ameritrade transactions migrated into
+Schwab when the accounts moved over. The marker applies across securities;
+`TD` is the separate ticker for Toronto-Dominion Bank.
+
+For all equity `Reinvest Shares` rows, regardless of symbol,
+inconsistent displayed prices are similarly replaced by
+`(-amount - fees) / quantity`. Share quantities, cash amounts, fees and original
+exports stay unchanged. Every price replacement is recorded in
+`converted-rows.csv`; this does not recover precision missing from Schwab's
+exported share quantity. Missing required values and nonfinite or invalid
+values are left for validation rather than used to invent a price. Existing
+bond/CUSIP pricing treatment is preserved. Other modern trades are not changed
+by this rule.
+
 Only unique, same-posted-date, same-symbol, opposite-quantity share journals
 across the source files, with no cash amount, are matched as internal transfers.
 They have no net effect on combined holdings. Cash/sweep journals, ambiguous
