@@ -67,3 +67,17 @@ def test_every_rename_is_unambiguous_and_sourced() -> None:
                     row,
                     other,
                 )
+
+
+def test_barrick_rename_respects_gold_ticker_reuse() -> None:
+    """Preserve Barrick history without relabelling Randgold or Gold.com."""
+    from cgt_calc.model import Isin
+    from cgt_calc.ticker_renames import ambiguity, current_ticker
+
+    assert current_ticker('GOLD', dt.date(2018, 12, 31)) == 'GOLD'
+    assert current_ticker('GOLD', dt.date(2019, 1, 2)) == 'B'
+    assert current_ticker('GOLD', dt.date(2025, 5, 9)) == 'B'
+    assert current_ticker('GOLD', dt.date(2025, 12, 1)) == 'B'
+    assert current_ticker('GOLD', dt.date(2025, 12, 2)) == 'GOLD'
+    assert current_ticker('GOLD', dt.date(2026, 1, 1), Isin('CA0679011084')) == 'B'
+    assert ambiguity('GOLD', [dt.date(2024, 9, 24), dt.date(2025, 12, 2)]) is not None

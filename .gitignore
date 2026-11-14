@@ -24,3 +24,4 @@ exchange_rates.csv
 /data/input/raw
 /data/interest/*.md
 /data/out
+/data/input/statements/
