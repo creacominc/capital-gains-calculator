@@ -18,8 +18,10 @@ date, symbol and description and ordered as required by the parser. Row provenan
 records the resulting order. Previously generated per-file copies in this output
 folder are retired, leaving only the merged export.
 
-`CD Interest` becomes `Bond Interest`, retaining its USD amount and all other
-cells. Missing TDA symbols are recovered only when the description contains
+`CD Interest` becomes `Bond Interest`, and bank-sweep `Bank Interest` becomes
+`Credit Interest`, retaining the USD amount, dates and all other cells. These
+are label conversions on existing rows, so they do not add duplicate income.
+Missing TDA symbols are recovered only when the description contains
 one explicit parenthesized ticker. Where migrated TDA quantities, unit prices
 and cash disagree, an effective unit price is calculated from the exported
 quantity, cash and fees. This preserves reported shares and cash but does not

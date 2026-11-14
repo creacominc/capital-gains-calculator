@@ -77,6 +77,32 @@ def test_cleaner_reports_supported_but_unpaired_action(tmp_path: Path) -> None:
 
 
 class CleanerTests(unittest.TestCase):
+    def test_bank_interest_is_preserved_as_interest_without_duplicate_income(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / "source"
+            source.mkdir()
+            export = source / "Account_Transactions.csv"
+            row = ["12/16/2025 as of 12/15/2025", "Bank Interest", "", "BANK INT TD BANK NA", "", "", "", "$3.75"]
+            with export.open("w", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(HEADER)
+                writer.writerow(row)
+            original = export.read_bytes()
+            for _ in range(2):
+                result = clean_exports(source, root / "output", root / "audit")
+                self.assertEqual(result["parser_errors"], [])
+                with (root / "output" / MERGED_NAME).open(newline="") as handle:
+                    cleaned = list(csv.DictReader(handle))
+                expected = dict(zip(HEADER, row))
+                expected["Action"] = "Credit Interest"
+                self.assertEqual(cleaned, [expected])
+            self.assertEqual(export.read_bytes(), original)
+            with (root / "audit/converted-rows.csv").open(newline="") as handle:
+                audit = list(csv.DictReader(handle))
+            self.assertEqual(len(audit), 1)
+            self.assertEqual(json.loads(audit[0]["original_row_json"]), row)
+
     def test_reinvestment_rule_is_symbol_independent_and_preserves_cash_and_fees(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

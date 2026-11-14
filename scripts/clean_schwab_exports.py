@@ -255,18 +255,19 @@ def clean_exports(input_dir: Path, output_dir: Path, audit_dir: Path, *, splits_
                                 "original_row_json": json.dumps(original), "output_row_json": json.dumps(row),
                             })
                             conversion_counts["TDA effective unit price" if migrated_tda else "Reinvestment effective unit price"] += 1
-                if action == "CD Interest":
+                interest_action = {"CD Interest": "Bond Interest", "Bank Interest": "Credit Interest"}.get(action)
+                if interest_action is not None:
                     original = row.copy()
-                    row[header.index("Action")] = "Bond Interest"
+                    row[header.index("Action")] = interest_action
                     converted.append({
                         "source_file": source.name, "source_row": line,
-                        "original_action": action, "output_action": "Bond Interest",
-                        "reason": "CD interest mapped to supported interest action",
+                        "original_action": action, "output_action": interest_action,
+                        "reason": f"{action} mapped to supported interest action; date, description and cash unchanged",
                         "original_row_json": json.dumps(original),
                         "output_row_json": json.dumps(row),
                     })
                     conversion_counts[action] += 1
-                    action = "Bond Interest"
+                    action = interest_action
                 reason = None
                 split_key = (row[header.index("Symbol")], transaction_date(row[header.index("Date")]).isoformat())
                 if action == "Stock Split" and split_key in overrides:
